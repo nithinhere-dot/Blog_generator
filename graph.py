@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph,START,END
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.types import Interrupt,Command
+from langgraph.types import interrupt,Command
 from typing import Literal
 from state import BlogState
 from agents import researcher_agent,writer_agent,editor_agent,get_llm
@@ -16,13 +16,14 @@ def researcher_node(state:BlogState):
         audience=state.audience,
         feedback=state.research_feedback
     )
+    print("Researcher Output:")
     state.research=researcher_data
     state.research_feedback=""
     return state
 
 def human_review_research_node(state:BlogState):
     """"Pause and ask the human to approve the research or send the feedback"""
-    decision=Interrupt({
+    decision=interrupt({
         "stage":"researcher_review",
         "research":state.research,
         "instructions":(
@@ -35,8 +36,9 @@ def human_review_research_node(state:BlogState):
     else:
         text=str(decision)
         action="approve" if text.lower()=="approve" else "revise"
-        feedback="" if action is "approve" else text
+        feedback="" if action == "approve" else text
     state.research_feedback=feedback
+    print("Human Review Research Output:")
     return state
 
 def writer_node(state:BlogState):
@@ -51,11 +53,12 @@ def writer_node(state:BlogState):
     )
     state.draft=writer_data
     state.draft_feedback=""
+    print("Writer Output:")
     return state
 
 def human_review_draft_node(state:BlogState):
     """"Pause and ask the human to approve the draft or send the feedback"""
-    decision=Interrupt({
+    decision=interrupt({
         "stage":"draft_review",
         "draft":state.draft,
         "instructions":(
@@ -68,8 +71,9 @@ def human_review_draft_node(state:BlogState):
     else:
         text=str(decision)
         action="approve" if text.lower()=="approve" else "revise"
-        feedback="" if action is "approve" else text
+        feedback="" if action == "approve" else text
     state.draft_feedback=feedback
+    print("Human Review Draft Output:")
     return state
 
 
@@ -82,18 +86,44 @@ def editor_node(state:BlogState):
         draft=state.draft,
     )
     state.final_blog=final 
+    print("Editor Output:")
     return state
 
 
-def human_review_research_node(state:BlogState)->Literal["researcher,writer"]:
+def route_after_research_review(state:BlogState)->Literal["researcher,writer"]:
     if state.research_feedback:
         return "researcher"
     else:
         return "writer"
 
-def human_review_draft_node(state:BlogState)->Literal["writer","final"]:
+def route_after_draft_review(state:BlogState)->Literal["writer","editor"]:
     if state.draft_feedback and state.revision_count<MAX_REVISIONS:
         return "writer"
     else:
-        return "final"
-    
+        return "editor"
+
+
+##Build and compile the graph
+def build_blog_graph():
+    builder=StateGraph(BlogState)
+
+    ###add nodes
+    builder.add_node("researcher",researcher_node)
+    builder.add_node("human_review_research",human_review_research_node)
+    builder.add_node("writer",writer_node)
+    builder.add_node("human_review_draft",human_review_draft_node)
+    builder.add_node("editor",editor_node)
+
+    ###add edges
+    builder.add_edge(START,"researcher")
+    builder.add_edge("researcher","human_review_research")
+    builder.add_edge("writer","human_review_draft")
+    builder.add_edge("editor",END)
+
+
+    ###add conditional edges
+    builder.add_conditional_edges("human_review_research",route_after_research_review,{"researcher":"researcher","writer":"writer"})
+    builder.add_conditional_edges("human_review_draft",route_after_draft_review,{"writer":"writer","editor":"editor"})
+
+    graph=builder.compile(checkpointer=InMemorySaver())
+    return graph

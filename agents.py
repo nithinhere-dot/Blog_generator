@@ -32,7 +32,7 @@ def researcher_agent(llm:ChatGoogleGenerativeAI,topic:str,audience:str,feedback:
 
     chain=RESEARCHER_PROMPT | llm
     result=chain.invoke({"topic":topic,"audience":audience,"revison_hints":revison_hints})
-    return result.content
+    return result.content[0]["text"]
 
 ##writer Agent
 WRITER_PROMPT=ChatPromptTemplate.from_messages([
@@ -67,7 +67,7 @@ def writer_agent(llm:ChatGoogleGenerativeAI,topic:str,audience:str,feedback:str=
         "audience":audience,
         "revison_hints":revison_hints,
         "research":research})
-    return result.content
+    return result.content[0]["text"]
 
 
 EDITOR_PROMPT=ChatPromptTemplate.from_messages([
@@ -99,4 +99,4 @@ def editor_agent(llm:ChatGoogleGenerativeAI,topic:str,draft:str):
        "draft":draft
        })
     
-    return result.content
+    return result.content[0]["text"]
