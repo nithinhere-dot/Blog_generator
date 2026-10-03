@@ -26,9 +26,9 @@ RESEARCHER_PROMPT=ChatPromptTemplate.from_messages([
 ])
 
 def researcher_agent(llm:ChatGoogleGenerativeAI,topic:str,audience:str,feedback:str=""):
+    revison_hints=f"The Human provided this feedback on your previous research-please address it:{feedback}"
     if not feedback:
         revison_hints="This is your first attempt."
-    revison_hints=f"The Human provided this feedback on your previous research-please address it:{feedback}"
 
     chain=RESEARCHER_PROMPT | llm
     result=chain.invoke({"topic":topic,"audience":audience,"revison_hints":revison_hints})
@@ -51,15 +51,15 @@ WRITER_PROMPT=ChatPromptTemplate.from_messages([
         topic:{topic},
         Research Notes:{research},
         Audience:{audience},
-        {revision_hints}
+        {revison_hints}
     """}    
 ])
 
 
 def writer_agent(llm:ChatGoogleGenerativeAI,topic:str,audience:str,feedback:str="",research:str=""):
+    revison_hints=f"The Human provided this feedback on your previous draft and asked for these changes:{feedback},please apply these changes during writing the blog"
     if not feedback:
         revison_hints="This is your first attempt."
-    revison_hints=f"The Human provided this feedback on your previous draft and asked for these changes:{feedback},please apply these changes during writing the blog"
 
     chain=WRITER_PROMPT | llm
     result=chain.invoke({
